@@ -82,6 +82,38 @@ func computeSVD(matrix: simd_float3x3) -> (U: simd_float3x3, S: simd_float3, V: 
     return (U: U, S: S, V: V)
 }
 
+// Precomputed workspace size for computeSVD below (3x3 SVD double precision)
+private let cachedWorksize: Int = {
+    // buffer for 3x3 matrix
+    var a = [Double](repeating: 0.0, count: 9)
+
+    // SVD parameters
+    var m = __CLPK_integer(3) // Number of rows
+    var n = __CLPK_integer(3) // Number of columns
+    var lda = m               // Leading dimension of A
+    var ldu = m               // Leading dimension of U
+    var ldvt = n              // Leading dimension of VT
+    var info: __CLPK_integer = 0
+
+    // Storage for singular values (S), U, and VT
+    var s = [Double](repeating: 0.0, count: 3)              // Singular values
+    var u = [Double](repeating: 0.0, count: Int(ldu * m))   // Left singular vectors (U)
+    var vt = [Double](repeating: 0.0, count: Int(ldvt * n)) // Right singular vectors (VT)
+
+    // 'A' => all columns of U / V^T are returned
+    let job = ("A" as NSString).utf8String.map { UnsafeMutablePointer(mutating: $0) }
+
+    // Workspace query (set lwork to -1 to get optimal size)
+    var lwork = __CLPK_integer(-1)
+    var workSizeQuery: Double = 0.0
+    dgesvd_(job, job, // All rows of VT
+            &m, &n, &a, &lda, &s, &u, &ldu, &vt, &ldvt,
+            &workSizeQuery, &lwork, &info)
+
+    return Int(workSizeQuery)
+}()
+
+
 //
 // Use the Accelerate framework to compute the Singular Value Decomposition of a 3x3 matrix.
 //
@@ -109,15 +141,19 @@ func computeSVD(matrix: simd_double3x3) -> (U: simd_double3x3, S: simd_double3, 
     // 'A' => all columns of U / V^T are returned
     let job = ("A" as NSString).utf8String.map { UnsafeMutablePointer(mutating: $0) }
 
-    // Workspace query (set lwork to -1 to get optimal size)
-    var lwork = __CLPK_integer(-1)
-    var workSizeQuery: Double = 0.0
-    dgesvd_(job, job, // All rows of VT
-            &m, &n, &a, &lda, &s, &u, &ldu, &vt, &ldvt,
-            &workSizeQuery, &lwork, &info)
+//    // Workspace query (set lwork to -1 to get optimal size)
+//    var lwork = __CLPK_integer(-1)
+//    var workSizeQuery: Double = 0.0
+//    dgesvd_(job, job, // All rows of VT
+//            &m, &n, &a, &lda, &s, &u, &ldu, &vt, &ldvt,
+//            &workSizeQuery, &lwork, &info)
+//
+//    // Allocate workspace based on the query
+//    lwork = __CLPK_integer(workSizeQuery)
+//    var work = [Double](repeating: 0.0, count: Int(lwork))
 
     // Allocate workspace based on the query
-    lwork = __CLPK_integer(workSizeQuery)
+    var lwork = __CLPK_integer(cachedWorksize)
     var work = [Double](repeating: 0.0, count: Int(lwork))
 
     // Perform SVD
