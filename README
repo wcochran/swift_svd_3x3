@@ -1,0 +1,11 @@
+Singular Value Decomposition (SVD) of 3x3 Matrix in Swift using Apple's Accelerate framework.
+W. Cochran  Jan 21, 2025
+
+There is a single and double precision version, but the double precision version is recommened:
+
+func computeSVD(matrix: simd_double3x3) -> (U: simd_double3x3, S: simd_double3, V: simd_double3x3)?
+
+The is a private global var cachedWorksize that holds the "scratch pad" that the accelerate framework
+needs to perform SVD in the 3x3 double precision case.
+
+main.swift is the test harness.
