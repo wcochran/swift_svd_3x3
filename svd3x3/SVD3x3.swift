@@ -161,13 +161,11 @@ func computeSVD(matrix: simd_double3x3) -> (U: simd_double3x3, S: simd_double3, 
             &m, &n, &a, &lda, &s, &u, &ldu, &vt, &ldvt,
             &work, &lwork, &info)
 
-    // Check for errors
     if info != 0 {
         print("SVD computation failed with info = \(info)")
         return nil
     }
 
-    // Convert results back to simd_double3x3
     var U = simd_double3x3(
         simd_double3(u[0], u[1], u[2]), // First column of U
         simd_double3(u[3], u[4], u[5]), // Second column of U
